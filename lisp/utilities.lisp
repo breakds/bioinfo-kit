@@ -7,21 +7,21 @@
   (defun load-string (string-spec)
     (if (consp string-spec)
 	(case (car string-spec)
-	  (:file `(with-open-file (in ,string-spec
-				      :direction :input)
-		    (read-line in)))
+	  (:file (with-open-file (in string-spec
+                                     :direction :input)
+                   (read-line in)))
 	  (t (error "Unknown string specifier.")))
 	string-spec)))
 
-;; (eval-when (:compile-toplevel :load-toplevel :execute)
-;;   (defun load-stream (stream-spec)
-;;     (if (consp stream-spec)
-;; 	(case (car string-spec)
-;; 	  (:file `(with-open-file (in ,string-spec
-;; 				      :direction :input)
-;; 		    (read-line in)))
-;; 	  (t (error "Unknown string specifier.")))
-;; 	string-spec)))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun load-stream (stream-spec)
+    (if (consp stream-spec)
+	(case (car string-spec)
+	  (:file (with-open-file (in ,string-spec
+                                     :direction :input)
+                   in))
+	  (t (error "Unknown string specifier.")))
+	string-spec)))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun transform-string-args (transform-string transform-stream args)
@@ -29,7 +29,7 @@
 	      (if (consp arg)
 		  (case (car arg)
 		    (:string (funcall transform-string
-				      (second arg)))
+                                      (second arg)))
 		    (:stream (funcall transform-stream
 				      (second arg))))
 		  arg))
@@ -42,7 +42,8 @@
 	      ,@body)
 	    (defmacro ,fun-name 
 		,(transform-string-args #`,(symb x1 '-str) #`,x1 args)
-	      `(,',(symb fun-name '-impl) 
-		   ,',(transform-string-args #`,(load-string (symb x1 '-str))
-					     #`,x1
-					     args))))))
+	      `(apply #',',(symb fun-name '-impl)
+                      (list ,,@(transform-string-args #`(load-string ,(symb x1 '-str))
+                                                      #`,x1
+                                                      args)))))))
+

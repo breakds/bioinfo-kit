@@ -3,6 +3,20 @@
 
 (in-package #:breakds.bioinfo-kit)
 
+(def-string-fun reverse-complement (text)
+  (labels ((iter (k accu)
+             (if (>= k (length text)) 
+                 (coerce accu 'string)
+                 (iter (1+ k) (cons (case (char text k) 
+                                      (#\A #\T)
+                                      (#\T #\A)
+                                      (#\C #\G)
+                                      (#\G #\C))
+                                    accu)))))
+    (iter 0 nil)))
+
+
+
 (defun get-prefix-func (pattern)
   "Derives the prefix function for the provided pattern. This is the
   core to KMP algorithm."
@@ -14,13 +28,13 @@
                             :initial-element 0)))
     (labels ((first-time-solve (index target-char)
                (let ((guess (aref prefix index)))
-               (if (char= (char pattern guess)
-                          target-char)
-                   (1+ guess)
-                   (if (zerop guess)
-                       0
-                       (first-time-solve guess
-                                         target-char))))))
+                 (if (char= (char pattern guess)
+                            target-char)
+                     (1+ guess)
+                     (if (zerop guess)
+                         0
+                         (first-time-solve guess
+                                           target-char))))))
       (loop for i from 2 to (length pattern)
          do (setf (aref prefix i)
                   (first-time-solve (1- i) 
@@ -98,4 +112,69 @@
 	 when (not (char= a b))
 	 summing 1)
       (error "Two input strings are not of equal length.")))
+
+(def-string-fun approximate-pattern-match (text pattern threshold)
+  (loop for i from 0 to (- (length text) (length pattern))
+     when (<= (hamming-distance pattern (subseq text i (+ i (length pattern))))
+              threshold)
+     collect i))
+
+(defun gen-neighbors (pattern distance)
+  (labels ((flipped-word (word pos new-digit)
+             (let ((result (copy-seq word)))
+               (setf (char result pos) new-digit)
+               result))
+           (flip-digits (start flips current)
+             (let ((remainder (- (length pattern) start)))
+               (cond ((or (= flips 0) (= remainder 0)) nil)
+                     (t (append (mapcan (lambda (new-digit)
+                                          (let ((new-word (flipped-word current
+                                                                        start 
+                                                                        new-digit)))
+                                            (cons new-word
+                                                  (flip-digits (1+ start)
+                                                               (1- flips)
+                                                               new-word))))
+                                        (remove-if #`,(char= (char current start) x1)
+                                                   '(#\A #\C #\G #\T)))
+                                (flip-digits (1+ start) flips current)))))))
+    (cons pattern (flip-digits 0 distance pattern))))
+
+(def-string-fun frequent-with-mismatch (text pattern-length tolerance
+                                             enable-rc)
+  (let ((records (make-hash-table :test #'equal)))
+    (loop 
+       for i below (- (length text) pattern-length)
+       for word = (subseq text i (+ i pattern-length))
+       do (aif (gethash word records)
+               (setf (gethash word records)
+                     (list (1+ (car it))
+                           (cadr it)))
+               (setf (gethash word records)
+                     (list 1 (union (if enable-rc 
+                                        (gen-neighbors (reverse-complement word)
+                                                       tolerance)
+                                        nil)
+                                    (gen-neighbors word tolerance))))))
+    (let ((counter (make-hash-table :test #'equal))
+          (max-occurs 0)
+          max-list)
+      (loop for record being the hash-values of records
+         do (loop for word in (cadr record)
+               do (incf (gethash word counter 0) (car record))))
+      (loop 
+         for candidate being the hash-keys of counter
+         for occurs being the hash-values of counter
+         do (cond ((> occurs max-occurs) 
+                   (setf max-occurs occurs
+                         max-list (list candidate)))
+                  ((= occurs max-occurs)
+                   (push candidate max-list))))
+      (values max-list max-occurs))))
+
+
+
+
+
+
 

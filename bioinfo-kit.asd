@@ -3,6 +3,7 @@
     :depends-on (:basicl)
     :components ((:file "lisp/packages")
 		 (:file "lisp/utilities")
-		 (:file "lisp/pattern-match")))
+		 (:file "lisp/pattern-match")
+                 (:file "lisp/oric")))
 
 

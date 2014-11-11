@@ -1,9 +1,11 @@
 (asdf:defsystem #:bioinfo-kit
     :serial t
-    :depends-on (:basicl)
+    :depends-on (:basicl
+                 :struct-wrapper)
     :components ((:file "lisp/packages")
 		 (:file "lisp/utilities")
 		 (:file "lisp/pattern-match")
-                 (:file "lisp/oric")))
+                 (:file "lisp/oric")
+                 (:file "lisp/sequence")))
 
 

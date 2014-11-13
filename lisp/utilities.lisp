@@ -39,3 +39,12 @@
 	  :initial-value nil))
 	    
 
+(defun sub-circ-seq (original start len)
+  (let ((end (+ start len)))
+    (if (<= end (length original))
+        (subseq original start end)
+        (concatenate 'string 
+                     (subseq original start 
+                             (length original))
+                     (subseq original 0 (- end (length original)))))))
+      

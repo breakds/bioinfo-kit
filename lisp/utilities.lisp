@@ -28,3 +28,14 @@
 				(list ,@(mapcar #`,(symb x1 '-1) args)))
 			:initial-value (list ',(symb name '-impl) ,@args)))))))
 
+
+(defmacro union-string-lists (&rest string-list)
+  (reduce (lambda (result current-list)
+	    (if (null result)
+		current-list
+		`(union ,current-list ,result
+			:test #'equal)))
+	  string-list
+	  :initial-value nil))
+	    
+

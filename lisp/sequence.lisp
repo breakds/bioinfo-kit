@@ -33,12 +33,40 @@
                         (car codons))))))
   (init-sequence))
 
+(defun transcribe (dna)
+  (let ((rna (copy-seq dna)))
+    (loop for i below (length rna)
+       when (eq (char rna i) #\T)
+       do (setf (char rna i) #\U))
+    rna))
+
 (declaim (inline rna-to-amino))
 (defun rna-to-amino (rna)
-  (coerce (loop for i from 0 below (length rna) by 3
+  (coerce (loop for i from 0 to (- (length rna) 3) by 3
              collect (gethash (subseq rna i (+ i 3))
                               +rna-to-amino+))
           'string))
+
+(def-string-fun peptite-all-matches (text peptite)
+  (labels ((solve (dna)
+	     (let ((occurs (kmp-all-matches (rna-to-amino (transcribe dna))
+					    peptite)))
+	       (loop for pos in occurs
+		  collect (subseq dna (* pos 3) 
+				  (* (+ pos (length peptite)) 3))))))
+    (let ((rc (reverse-complement text)))
+      (append (solve text)
+	      (solve (subseq text 1))
+	      (solve (subseq text 2))
+	      (mapcar #`,(reverse-complement x1) 
+		      (solve rc))
+	      (mapcar #`,(reverse-complement x1) 
+		      (solve (subseq rc 1)))
+	      (mapcar #`,(reverse-complement x1) 
+		      (solve (subseq rc 2)))))))
+
+
+    
   
 
 

@@ -188,6 +188,10 @@
   (mass-seq-spectrum (loop for amino across peptide
 			collect (amino-mass amino))))
 
+(def-string-fun peptide-linear-spectrum (peptide)
+  (mass-seq-linear-spectrum (loop for amino across peptide
+                               collect (amino-mass amino))))
+
 (defun spectrum-from-list (mass-list)
   (let ((spectrum (make-hash-table)))
     (loop for mass in mass-list
@@ -211,7 +215,7 @@
       collect (list mass count))
    #2`,(< (car x1) (car x2))))
 
-(defun diff-spectrum (spectrum)
+(defun diff-spectrum (spectrum &optional (extension nil))
   (let ((spec-list (spectrum-to-list spectrum))
 	(diff (make-hash-table)))
     (loop for piece on spec-list
@@ -220,7 +224,10 @@
 	     for mass-diff = (- (car upper) 
 	     			(caar piece))
 	     until (< +max-amino-mass+ mass-diff)
-	     when (lookup-mass mass-diff)
+	     when (if extension
+                      (and (>= mass-diff 57)
+                           (<= mass-diff 200))
+                      (lookup-mass mass-diff))
 	     do (incf (gethash mass-diff diff 0)
 	     	      (* (cadr upper)
 	     		 (cadar piece)))))
@@ -231,14 +238,13 @@
 			  #2`,(> (cadr x1)
 				 (cadr x2))))
 	 (previous (cadar spec-list)))
-    (intersection (loop 
-		     for pair in spec-list
-		     until (> (* previous +candidate-max-decay-rate+) 
-			      (cadr pair))
-		     do (setf previous (cadr pair))
-		     collect (car pair))
-		  (mapcar #`,(car x1)
-			  (spectrum-to-list spectrum)))))
+    (loop 
+       for pair in spec-list
+       until (> (* previous +candidate-max-decay-rate+) 
+                (cadr pair))
+       do (setf previous (cadr pair))
+       collect (car pair))))
+
 
 (defun spectrum>= (spec-a spec-b)
   (not (loop 
@@ -283,9 +289,8 @@
 	   do (setf pieces new-pieces))))
     answer))
 
-(defun format-sequenced (list-of-answers)
-  (loop for answer in list-of-answers
-     do (format t "~{~a~^-~}~%" answer)))
+(defun format-sequenced (answer)
+  (format t "~{~a~^-~}~%" answer))
 
 (defun spectrum-intersection-score (spec-a spec-b)
   (loop 
@@ -293,6 +298,83 @@
      for count being the hash-values of spec-b
      sum (min (gethash mass spec-a 0) count)))
 
+(defun identify-candidates-extra (spectrum top-k)
+  (let* ((spec-list (sort (spectrum-to-list (diff-spectrum spectrum t))
+			  #2`,(> (cadr x1)
+				 (cadr x2)))))
+    (print spec-list)
+    (loop 
+       for i below top-k
+       for pair in spec-list
+       collect (car pair))))
+
+(defun sequence-2 (mass-list &optional 
+                               (top-candidate-num 10)
+                               (extension 0))
+  "Sequencing with leading board. If EXTENSION is specified, we will
+  consider extended set of aminos and keep top EXTENSION candidates as
+  hypothesis aminos."
+  (let* ((spectrum (spectrum-from-list mass-list))
+         (candidates (if (zerop extension)
+                         (identify-candidates spectrum)
+                         (identify-candidates-extra spectrum extension)))
+         (total-mass (apply #'max mass-list))
+         best)
+    (format t "candidates: ~{~a~^ ~}~%" candidates)
+    (format t "total-mass: ~a~%" total-mass)
+    (labels ((expand (pieces) 
+	       (loop for piece in pieces
+		  append (mapcar #`,(cons x1 piece)
+				 candidates)))
+             (try-update (piece)
+               (let ((score (spectrum-intersection-score 
+                             spectrum
+                             (mass-seq-spectrum piece))))
+                 (cond ((not best) (setf best (list (list score piece))))
+                       ((> score (caar best)) (setf best (list (list score piece))))
+                       ((= score (caar best)) (push (list score piece) best)))))
+             (linear-score (piece)
+               (spectrum-intersection-score
+                spectrum
+                (mass-seq-linear-spectrum piece)))
+             (top-k-with-ties (scored-pieces k &optional tie-score)
+               (when (not (null scored-pieces))
+                 (cond ((> k 1) (cons (cadar scored-pieces)
+                                      (top-k-with-ties (rest scored-pieces)
+                                                       (1- k))))
+                       ((= k 1) (cons (cadar scored-pieces)
+                                      (top-k-with-ties (rest scored-pieces)
+                                                       0
+                                                       (caar scored-pieces))))
+                       ((= (caar scored-pieces) tie-score) 
+                        (cons (cadar scored-pieces)
+                              (top-k-with-ties (rest scored-pieces)
+                                               (1- k)
+                                               tie-score)))
+                       (t nil))))
+             (elect-leaders (pieces)
+               (let (survived)
+                 (loop for piece in pieces
+                    do (let ((mass (apply #'+ piece)))
+                         (cond ((= mass total-mass) (try-update piece))
+                               ((< mass total-mass) (push (list (linear-score piece) piece)
+                                                          survived)))))
+                 (top-k-with-ties (sort survived #2`,(> (car x1) (car x2)))
+                                  top-candidate-num))))
+      (let ((pieces '(nil)))
+        (loop for new-pieces = (elect-leaders (expand pieces))
+           while new-pieces
+           do (setf pieces new-pieces))))
+    best))
+                 
+
+                 
+                      
+                 
+
+    
+    
+    
 
 
 	

@@ -5,17 +5,17 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defparameter +rna-to-amino+ (make-hash-table :test #'equal))
+  (defparameter +max-amino-mass+ 186)
   (defparameter +mass-table+ (make-hash-table))
+  (defparameter +candidate-max-decay-rate+ 0.1)
   (defmacro init-mass-table (mass-table)
-    (progn (setf +mass-table+ (make-hash-table))
-           (loop for pair in mass-table
-              do (push (car pair) (gethash (cadr pair)
-                                           +mass-table+
-                                           nil)))
-           `(progn (defun amino-mass (amino)
-                     (case amino ,@mass-table (t 0)))
-                   (defun lookup-mass (mass)
-                     (gethash mass +mass-table+)))))
+    `(progn (defun amino-mass (amino)
+	      (case amino ,@mass-table (t 0)))
+	    (defun lookup-mass (mass)
+	      (gethash mass +mass-table+))
+	    ,@(mapcar #`(push ,(car x1)
+			      (gethash ,(cadr x1) +mass-table+ nil))
+		      mass-table)))
   (defun init-sequence ()
     (let ((codon-table '((#\I "AUU" "AUC" "AUA")
                          (#\L "CUU" "CUC" "CUA" "CUG" "UUA" "UUG")
@@ -125,30 +125,182 @@
   (loop for amino across peptide
      sum (amino-mass amino)))
 
+(defun mass-seq-spectrum (mass-seq)
+  (let* ((repeated (append mass-seq mass-seq))
+	 (len (length mass-seq))
+	 (total-mass (apply #'+ mass-seq))
+	 (spectrum (make-hash-table)))
+    (incf (gethash 0 spectrum 0))
+    (incf (gethash total-mass spectrum 0))
+    (labels ((create-accu-sum (seq) 
+	       (let ((result (make-array (+ (length seq) 1)
+					 :initial-element 0))
+		     (accu 0))
+		 (loop 
+		    for i below (length seq)
+		    for mass in seq
+		    do (setf (aref result (1+ i))
+			     (incf accu mass)))
+		 result))
+	     (subseq-sum (accu-sum i j)
+	       (- (aref accu-sum (+ i j))
+		  (aref accu-sum i))))
+      (let ((accu-sum (create-accu-sum repeated)))
+	(loop for sub-len from 1 to (ash len -1)
+	   do (loop 
+		 for pos below len
+		 for mass = (subseq-sum accu-sum pos sub-len)
+		 do (progn (incf (gethash mass spectrum 0))
+			   (when (< sub-len (- len sub-len))
+			     (incf (gethash (- total-mass mass)
+					    spectrum
+					    0))))))
+	spectrum))))
+
+(defun mass-seq-linear-spectrum (mass-seq)
+  (let* ((len (length mass-seq))
+	 (total-mass (apply #'+ mass-seq))
+	 (spectrum (make-hash-table)))
+    (incf (gethash 0 spectrum 0))
+    (incf (gethash total-mass spectrum 0))
+    (labels ((create-accu-sum (seq) 
+	       (let ((result (make-array (+ (length seq) 1)
+					 :initial-element 0))
+		     (accu 0))
+		 (loop
+		    for i below (length seq)
+		    for mass in seq
+		    do (setf (aref result (1+ i))
+			     (incf accu mass)))
+		 result))
+	     (subseq-sum (accu-sum i j)
+	       (- (aref accu-sum (+ i j))
+		  (aref accu-sum i))))
+      (let ((accu-sum (create-accu-sum mass-seq)))
+	(loop for sub-len from 1 to (- len 1)
+	   do (loop 
+		 for pos from 0 to (- len sub-len)
+		 for mass = (subseq-sum accu-sum pos sub-len)
+		 do (incf (gethash mass spectrum 0)))))
+    spectrum)))
+
 (def-string-fun peptide-spectrum (peptide)
-  (let* ((repeated (concatenate 'string peptide peptide))
-         (len (length peptide))
-         (total-mass (peptide-mass peptide))
-         (spectrum (make-hash-table)))
-    (loop for sub-len from 1 to (ash len -1)
-       do (loop 
-             for pos below len
-             for mass = (peptide-mass (subseq repeated pos 
-                                              (+ pos sub-len)))
-             do (progn (incf (gethash mass spectrum 0))
-                       (when (< sub-len (- len sub-len))
-                         (incf (gethash (- total-mass mass)
-                                        spectrum
-                                        0))))))
+  (mass-seq-spectrum (loop for amino across peptide
+			collect (amino-mass amino))))
+
+(defun spectrum-from-list (mass-list)
+  (let ((spectrum (make-hash-table)))
+    (loop for mass in mass-list
+       do (incf (gethash mass spectrum 0)))
     spectrum))
+	  
 
 (defun print-spectrum (spectrum)
   (format t "~a"
-          (loop 
-             for mass being the hash-keys of spectrum
-             for count being the hash-values of spectrum
-             append (map-n #`,mass count))))
+          (sort (loop 
+		   for mass being the hash-keys of spectrum
+		   for count being the hash-values of spectrum
+		   append (map-n #`,mass count))
+		#'<)))
 
+(defun spectrum-to-list (spectrum)
+  (sort 
+   (loop
+      for mass being the hash-keys of spectrum
+      for count being the hash-values of spectrum
+      collect (list mass count))
+   #2`,(< (car x1) (car x2))))
+
+(defun diff-spectrum (spectrum)
+  (let ((spec-list (spectrum-to-list spectrum))
+	(diff (make-hash-table)))
+    (loop for piece on spec-list
+       do (loop 
+	     for upper in piece
+	     for mass-diff = (- (car upper) 
+	     			(caar piece))
+	     until (< +max-amino-mass+ mass-diff)
+	     when (lookup-mass mass-diff)
+	     do (incf (gethash mass-diff diff 0)
+	     	      (* (cadr upper)
+	     		 (cadar piece)))))
+    diff))
+
+(defun identify-candidates (spectrum)
+  (let* ((spec-list (sort (spectrum-to-list (diff-spectrum spectrum))
+			  #2`,(> (cadr x1)
+				 (cadr x2))))
+	 (previous (cadar spec-list)))
+    (intersection (loop 
+		     for pair in spec-list
+		     until (> (* previous +candidate-max-decay-rate+) 
+			      (cadr pair))
+		     do (setf previous (cadr pair))
+		     collect (car pair))
+		  (mapcar #`,(car x1)
+			  (spectrum-to-list spectrum)))))
+
+(defun spectrum>= (spec-a spec-b)
+  (not (loop 
+	  for mass being the hash-keys of spec-b
+	  when (not (gethash mass spec-a))
+	  return t)))
+
+(defun spectrum= (spec-a spec-b)
+  (when (= (hash-table-count spec-a)
+	   (hash-table-count spec-b))
+    (not (loop 
+	    for mass being the hash-keys of spec-a
+	    for count being the hash-values of spec-a
+	    when (not (gethash mass spec-b))
+	    return t))))
+
+(defun sequence-1 (mass-list)
+  (let* ((spectrum (spectrum-from-list mass-list))
+	 (candidates (identify-candidates spectrum))
+	 (total-mass (apply #'max mass-list))
+	 answer)
+    (format t "candidates: ~{~a ~}~%" candidates)
+    (format t "total-mass: ~a~%" total-mass)
+    (labels ((expand (pieces) 
+	       (loop for piece in pieces
+		  append (mapcar #`,(cons x1 piece)
+				 candidates)))
+	     (consistent-filter (pieces)
+	       (let (survived)
+		 (loop for piece in pieces
+		    do (let ((piece-spec (mass-seq-linear-spectrum piece)))
+			 (when (spectrum>= spectrum piece-spec)
+			   (if (and (= (apply #'+ piece) total-mass)
+			            (spectrum= spectrum 
+					       (mass-seq-spectrum piece)))
+			       (push piece answer)
+			       (push piece survived)))))
+		 survived)))
+      (let ((pieces '(nil)))
+	(loop for new-pieces = (consistent-filter (expand pieces))
+	   while new-pieces
+	   do (setf pieces new-pieces))))
+    answer))
+
+(defun format-sequenced (list-of-answers)
+  (loop for answer in list-of-answers
+     do (format t "~{~a~^-~}~%" answer)))
+
+(defun spectrum-intersection-score (spec-a spec-b)
+  (loop 
+     for mass being the hash-keys of spec-b
+     for count being the hash-values of spec-b
+     sum (min (gethash mass spec-a 0) count)))
+
+
+
+	
+	       
+  
+		    
+      
+	 
          
     
 

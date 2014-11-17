@@ -113,10 +113,10 @@
 	 summing 1)
       (error "Two input strings are not of equal length.")))
 
-(def-string-fun approximate-pattern-match (text pattern threshold)
+(def-string-fun approximate-pattern-match (text pattern tolerance)
   (loop for i from 0 to (- (length text) (length pattern))
      when (<= (hamming-distance pattern (subseq text i (+ i (length pattern))))
-              threshold)
+              tolerance)
      collect i))
 
 (defun gen-neighbors (pattern distance)

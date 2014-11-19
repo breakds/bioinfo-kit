@@ -35,6 +35,80 @@
        when (< score (car best))
        do (setf best (list score candidate)))
     (cadr best)))
+
+(defun profile-from-list (profile-list)
+  (let* ((size (length (car profile-list))))
+    (make-array (list 4 size)
+                :initial-contents profile-list)))
+
+(defun profile-size (profile)
+  (second (array-dimensions profile)))
+
+(defun profile-fit-score (pattern profile)
+  (let ((score 1.0))
+    (loop 
+       for nucl across pattern
+       for i from 0
+       do (setf score (* (aref profile (nucleobase-id nucl) i)
+                         score)))
+    score))
+
+(defun profile-match (dna profile)
+  (let ((size (profile-size profile))
+        best)
+    (loop 
+       for i below (- (length dna) size)
+       for score = (profile-fit-score 
+                    (subseq dna i (+ i size))
+                    profile)
+       when (or (null best) (> score (car best)))
+       do (setf best (list score i)))
+    (subseq dna (cadr best) 
+            (+ (cadr best) size))))
+
+(defun motifs-profile (motifs)
+  (let ((profile (make-array (list 4 (length (car motifs)))))
+        (unit (/ 1 (length (car motifs)))))
+    (loop for motif in motifs
+       do (loop for i below (length (car motifs))
+             do (incf (aref profile 
+                            (nucleobase-id (char motif i))
+                            i)
+                      unit)))
+    profile))
+
+(defun profile-score (profile)
+  "Sum of number of minorities. The lower the best."
+  (loop for i below (profile-size profile)
+     sum (- 1.0 (max (aref profile 0 i)
+                     (aref profile 1 i)
+                     (aref profile 2 i)
+                     (aref profile 3 i)))))
+
+(defun greedy-motif-search (dna-list pattern-size)
+  (let ((best-score pattern-size)
+        (best-motifs nil))
+    (loop 
+       for i below (- (length (car dna-list)) pattern-size)
+       for candidate = (subseq (car dna-list) i (+ i pattern-size))
+       do (let ((profile (motifs-profile (list candidate)))
+                (motifs (list candidate)))
+            (loop 
+               for dna in (rest dna-list)
+               for current-best = (profile-match dna profile)
+               do (setf motifs (cons current-best motifs)
+                        profile (motifs-profile motifs)))
+            (let ((new-score (profile-score profile)))
+              (if (< new-score best-score)
+                  (setf best-score new-score
+                        best-motifs motifs)))))
+    (nreverse best-motifs)))
+
+
+  
+                        
+  
+  
          
   
   

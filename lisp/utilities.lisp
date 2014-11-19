@@ -47,4 +47,19 @@
                      (subseq original start 
                              (length original))
                      (subseq original 0 (- end (length original)))))))
-      
+
+(defun nucleobase-id (nucleobase)
+  (case nucleobase
+    (#\A 0)
+    (#\C 1)
+    (#\G 2)
+    (#\T 3)
+    (t -1)))
+
+(defun id-nucleobase (id)
+  (case id
+    (0 #\A)
+    (1 #\C)
+    (2 #\G)
+    (3 #\T)
+    (t #\*)))

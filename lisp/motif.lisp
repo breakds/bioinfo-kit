@@ -1,6 +1,8 @@
 ;;;; motif.lisp
 ;;;; Author: Break Yang <breakds@gmail.com>
 
+(in-package #:breakds.bioinfo-kit)
+
 (defun motif-enumeration (dna-list pattern-length tolerance)
   (let ((template (coerce (loop for i below pattern-length collect #\T)
                           'string)))
@@ -68,7 +70,7 @@
 
 (defun motifs-profile (motifs)
   (let ((profile (make-array (list 4 (length (car motifs)))))
-        (unit (/ 1 (length (car motifs)))))
+        (unit (/ 1 (length motifs))))
     (loop for motif in motifs
        do (loop for i below (length (car motifs))
              do (incf (aref profile 
@@ -103,6 +105,38 @@
                   (setf best-score new-score
                         best-motifs motifs)))))
     (nreverse best-motifs)))
+
+(defun motifs-profile-laplace (motifs)
+  (let* ((unit (/ 1 (+ (length motifs) 4)))
+         (profile (make-array (list 4 (length (car motifs)))
+                              :initial-element unit)))
+    (loop for motif in motifs
+       do (loop for i below (length (car motifs))
+             do (incf (aref profile 
+                            (nucleobase-id (char motif i))
+                            i)
+                      unit)))
+    profile))
+
+(defun greedy-motif-search-1 (dna-list pattern-size)
+  (let ((best-score pattern-size)
+        (best-motifs nil))
+    (loop 
+       for i below (- (length (car dna-list)) pattern-size)
+       for candidate = (subseq (car dna-list) i (+ i pattern-size))
+       do (let ((profile (motifs-profile (list candidate)))
+                (motifs (list candidate)))
+            (loop 
+               for dna in (rest dna-list)
+               for current-best = (profile-match dna profile)
+               do (setf motifs (cons current-best motifs)
+                        profile (motifs-profile-laplace motifs)))
+            (let ((new-score (profile-score (motifs-profile motifs))))
+              (if (< new-score best-score)
+                  (setf best-score new-score
+                        best-motifs motifs)))))
+    (nreverse best-motifs)))
+
 
 
   

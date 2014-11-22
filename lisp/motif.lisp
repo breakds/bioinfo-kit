@@ -124,7 +124,7 @@
     (loop 
        for i below (- (length (car dna-list)) pattern-size)
        for candidate = (subseq (car dna-list) i (+ i pattern-size))
-       do (let ((profile (motifs-profile (list candidate)))
+       do (let ((profile (motifs-profile-laplace (list candidate)))
                 (motifs (list candidate)))
             (loop 
                for dna in (rest dna-list)
@@ -135,9 +135,7 @@
               (if (< new-score best-score)
                   (setf best-score new-score
                         best-motifs motifs)))))
-    (nreverse best-motifs)))
-
-
+    (nreverse best-motifs)))      
 
   
                         

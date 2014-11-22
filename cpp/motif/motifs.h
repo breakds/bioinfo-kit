@@ -2,23 +2,24 @@
 #include <vector>
 #include <iostream>
 #include <algorithm>
-
-using std::string;
-using std::vector;
-using std::cin;
-using std::cout;
-using std::cerr;
-
+#include <random>
+#include <chrono>
 
 namespace motif {
-  
+
+  using std::string;
+  using std::vector;
+  using std::cin;
+  using std::cout;
+  using std::cerr;
+
   class DNA {
   public:
     class SubSeq {
     public:
     SubSeq(const DNA *dna, int start, int length) 
       : parent_(dna), start_(start), 
-        length_(start + length > dna->dna_.size() ? 0 : length) {}
+	length_(start + length > dna->dna_.size() ? 0 : length) {}
 
       const int &operator[](int index) const {
 	return parent_->dna_[start_ + index];
@@ -67,6 +68,11 @@ namespace motif {
       return SubSeq(this, start, length);
     }
 
+    SubSeq RandomSubSeq(int length) const {
+      std::uniform_int_distribution<int> uniform(0, size() - length);
+      return SubSeq(this, uniform(generator), length);
+    }
+
     int size() const {
       return dna_.size();
     }
@@ -93,9 +99,13 @@ namespace motif {
       return '*';
     }
 
+    static std::default_random_engine generator;
     vector<int> dna_;
   };
 
+  std::default_random_engine DNA::generator(
+					    std::chrono::system_clock::now().time_since_epoch().count());
+  
   class StatsMatrix {
   public:
   StatsMatrix(const vector<DNA::SubSeq> &seqs)

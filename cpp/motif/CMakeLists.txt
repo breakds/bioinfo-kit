@@ -20,4 +20,5 @@ SET(CMAKE_CXX_FLAGS_DEBUG "-O0 -g")
 SET(CMAKE_CXX_FLAGS_GPROF "-O1 -pg")
 
 ADD_EXECUTABLE(greedy greedy_motif_search.cc)
+ADD_EXECUTABLE(random random_motif_search.cc)
 

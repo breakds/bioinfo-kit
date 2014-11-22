@@ -31,7 +31,7 @@ public:
 
     void Print() const {
       for (int i = 0; i < length_; ++i) {
-        cout << DNA::IdToNucleobase((*this)[start_ + i]);
+        cout << DNA::IdToNucleobase((*this)[i]);
       }
       cout << "\n";
     }
@@ -126,10 +126,11 @@ public:
 
   int Score() const {
     int score = std::accumulate(matrix_.begin(), 
-                               matrix_.end(), 0);
+				matrix_.end(), 0);
     auto iter = matrix_.begin();
     while (matrix_.end() > iter) {
       score -= *std::max_element(iter, iter + 4);
+      iter += 4;
     }
     return score;
   }
@@ -152,6 +153,7 @@ public:
       DNA::SubSeq candidate = dna.GetSubSeq(i, pattern_size);
       if (candidate.Empty()) break;
       double score = SubSeqPsuedoScore(candidate);
+      
       if (score > best_score) {
         best_score = score;
         pos = i;
@@ -194,13 +196,14 @@ int main() {
   cin >> pattern_size;
   cin >> dnas_size;
 
+  string dna_string;
+  getline(cin, dna_string);
   vector<DNA> dnas;
   for (int i = 0; i < dnas_size; ++i) {
-    string dna_string;
     getline(cin, dna_string);
     dnas.emplace_back(dna_string);
   }
-  
+
   vector<DNA::SubSeq> result = GreedyMotifSearch(dnas, pattern_size);
 
   for (const DNA::SubSeq &motif : result) {

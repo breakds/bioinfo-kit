@@ -7,6 +7,7 @@
 		 (:file "lisp/pattern-match")
                  (:file "lisp/oric")
                  (:file "lisp/sequence")
-                 (:file "lisp/motif")))
+                 (:file "lisp/motif")
+                 (:file "lisp/assembly")))
 
 

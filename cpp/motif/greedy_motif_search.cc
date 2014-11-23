@@ -14,7 +14,7 @@ using namespace motif;
 vector<DNA::SubSeq> GreedyMotifSearch(const vector<DNA> &dnas,
                                       const int pattern_size) {
   vector<DNA::SubSeq> answer;
-  double best = (dnas.size() + 2) * pattern_size;
+  int best = (dnas.size() + 2) * pattern_size;
   for (int i = 0; i < dnas[0].size(); ++i) {
     vector<DNA::SubSeq> current({dnas[0].GetSubSeq(i, pattern_size)});
     if (current[0].Empty()) break;

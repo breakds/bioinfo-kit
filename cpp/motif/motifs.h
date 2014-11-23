@@ -103,8 +103,8 @@ namespace motif {
     vector<int> dna_;
   };
 
-  std::default_random_engine DNA::generator(
-					    std::chrono::system_clock::now().time_since_epoch().count());
+  std::default_random_engine 
+  DNA::generator(std::chrono::system_clock::now().time_since_epoch().count());
   
   class StatsMatrix {
   public:
@@ -119,6 +119,10 @@ namespace motif {
       matrix_ = other.matrix_;
     }
 
+    StatsMatrix &operator=(StatsMatrix&& other) {
+      matrix_.swap(other.matrix_);
+    }
+    
     inline void Update(const DNA::SubSeq &seq) {
       for (int i = 0; i < seq.size(); ++i) {
 	++matrix_[(i << 2) + seq[i]];
@@ -127,6 +131,16 @@ namespace motif {
 
     inline int operator()(int index, int nucleobase_id) const {
       return matrix_[(index << 2) + nucleobase_id];
+    }
+
+    inline StatsMatrix &operator-=(const DNA::SubSeq &seq) {
+      for (int i = 0; i < seq.size(); ++i) {
+        --matrix_[(i << 2) + seq[i]];
+      }
+    }
+
+    inline StatsMatrix &operator+=(const DNA::SubSeq &seq) {
+      Update(seq);
     }
 
     inline int Psuedo(int index, int nucleobase_id) const {

@@ -38,6 +38,21 @@
        do (setf best (list score candidate)))
     (cadr best)))
 
+(defun median-strings (dna-list pattern-length)
+  (let ((template (coerce (loop for i below pattern-length collect #\T)
+                          'string))
+        (best (list (1+ pattern-length) "")))
+    ;; This gen-neighbors call generates all the possible pattern with
+    ;; length pattern-length.
+    (loop 
+       for candidate in (gen-neighbors template pattern-length)
+       for score = (best-fit-score dna-list candidate)
+       when (< score (car best))
+       do (setf best (list score candidate))
+       when (= score (car best))
+       do (append best (list candidate)))
+    (cdr best)))
+
 (defun profile-from-list (profile-list)
   (let* ((size (length (car profile-list))))
     (make-array (list 4 size)

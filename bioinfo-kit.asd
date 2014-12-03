@@ -8,6 +8,7 @@
                  (:file "lisp/oric")
                  (:file "lisp/sequence")
                  (:file "lisp/motif")
+                 (:file "lisp/eulerian")
                  (:file "lisp/assembly")))
 
 

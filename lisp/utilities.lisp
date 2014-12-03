@@ -28,6 +28,15 @@
 				(list ,@(mapcar #`,(symb x1 '-1) args)))
 			:initial-value (list ',(symb name '-impl) ,@args)))))))
 
+(defmacro def-wrapped (name &body body)
+  (with-gensyms (filename)
+    `(defun ,(symb 'wrapped- name) (filename)
+       (with-open-file (in filename
+                           :direction :input)
+         (with-open-file (out (format nil "~a.ans" filename)
+                              :direction :output
+                              :if-exists :supersede)
+           ,@body)))))
 
 (defmacro union-string-lists (&rest string-list)
   (reduce (lambda (result current-list)

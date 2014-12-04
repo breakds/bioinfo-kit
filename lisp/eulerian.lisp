@@ -25,6 +25,26 @@
             (push (pop (aref ready trigger)) stack)))
         (pop (car stack))))))
 
+(defun unbalanced-nodes (edge-dict)
+  "Returns unbalanced nodes from a graph described by EDGE-DICT. The
+  return value will be a pair of nodes (A B) where A has smaller
+  in-degree and B has smaller out-degree."
+  (let ((in-degree (make-array (length edge-dict) 
+                               :element-type 'fixnum
+                               :initial-element 0))
+        a b)
+    (loop for ends across edge-dict
+       do (loop for end in ends
+             do (incf (aref in-degree end))))
+    (loop for i below (length edge-dict)
+       do (case (- (length (aref edge-dict i))
+                   (aref in-degree i))
+            (0 nil)
+            (1 (setf a i))
+            (-1 (setf b i))
+            (t (error "Invalid unbalanced node"))))
+    (list a b)))
+
 (defun eulerian-cycle (input-edge-dict &optional (start nil))
   (let ((edge-dict (copy-edge-dict input-edge-dict))
         (visit-dict (make-array (length input-edge-dict)
@@ -83,9 +103,60 @@
 (defun eulerian-cycle-from-list (edge-list)
   (multiple-value-bind (edge-dict translator)
       (edge-dict-from-list edge-list)
-    (let ((cycle (eulerian-cycle edge-dict)))
-      (loop for node = (funcall cycle) while node
-         collect (funcall translator node)))))
+    (destructuring-bind (start end) (unbalanced-nodes edge-dict)
+      (when start
+        (push start (aref edge-dict end)))
+      (let* ((cycle (eulerian-cycle edge-dict (if start start 0)))
+             (converted (loop for node = (funcall cycle) while node
+                           collect (funcall translator node))))
+        (if end
+            (subseq converted 0 (1- (length converted)))
+            converted)))))
+
+(defun eulerian-assembly (patterns)
+  (let* ((graph (prefix-dict patterns))
+         (edge-list (loop 
+                       for start being the hash-keys of graph
+                       for ends being the hash-values of graph
+                       collect (cons start ends))))
+    (multiple-value-bind (edge-dict translator)
+        (edge-dict-from-list edge-list)
+      (destructuring-bind (start end) (unbalanced-nodes edge-dict)
+        (when start
+          (push start (aref edge-dict end)))
+        (let* ((cycle (eulerian-cycle edge-dict (if start start 0)))
+               (result-list (nreverse (coerce (funcall translator 
+                                                       (funcall cycle))
+                                              'list))))
+          (loop 
+             for node = (funcall cycle)
+             while node
+             for pattern = (funcall translator node)
+             for x = (char pattern (1- (length pattern)))
+             do (push x result-list))
+          (coerce (nreverse (if end (rest result-list) result-list)) 'string))))))
+
+(defun universal-string (k)
+  (let ((mask (1- (ash 1 (1- k))))
+        (edge-dict (make-array (ash 1 k) :initial-element nil)))
+    ;; populate binary edge dictionary
+    (loop for i below (ash 1 k)
+       do (let ((left (ash (logand i mask) 1)))
+            (push left (aref edge-dict i))
+            (push (1+ left) (aref edge-dict i))))
+    (let ((format-string (format nil "~~~a,'0b: ~~{~~~a,'0b~~^,~~}~~%" k k)))
+      (loop for i below (ash 1 k)
+         do (format t format-string i (aref edge-dict i))))
+    (let ((cycle (eulerian-cycle edge-dict))
+          (result-list nil))
+      (loop 
+         for node = (funcall cycle)
+         while node
+         do (push (logand node 1) result-list))
+      (format nil "~{~a~}" (nreverse (rest result-list))))))
+
+      
+      
 
 (defun parse-edge (edge-descriptor)
   (let ((arrow-pos (car (kmp-all-matches edge-descriptor " -> "))))
@@ -96,6 +167,7 @@
 ;;; ---------- Wrappers ----------
 
 (def-wrapped eulerian-cycle
+  "handles both eulerian-cycle and eulerian-path."
   (let* ((edge-list (loop for line = (read-line in nil nil) 
                        while line
                        collect (parse-edge line)))
@@ -104,6 +176,19 @@
             (loop for edge in edge-list sum (1- (length edge)))
             (1- (length cycle)))
     (format out "~{~a~^->~}~%" cycle)))
+
+(def-wrapped eulerian-assembly
+  ;; Ignore the first line, which is the pattern length, as we can
+  ;; deduce it from the patterns anyway.
+  (read-line in)
+  (let* ((patterns (loop for line = (read-line in nil nil)
+                      while line collect line))
+         (assembly (eulerian-assembly patterns)))
+    (format out "~a~%" assembly)))
+
+
+
+
 
 
             

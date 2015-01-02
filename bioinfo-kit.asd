@@ -9,6 +9,8 @@
                  (:file "lisp/sequence")
                  (:file "lisp/motif")
                  (:file "lisp/eulerian")
-                 (:file "lisp/assembly")))
+                 (:file "lisp/assembly")
+                 (:file "lisp/comparison")))
+                        
 
 

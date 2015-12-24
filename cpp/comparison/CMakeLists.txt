@@ -24,5 +24,13 @@ SET(CMAKE_CXX_FLAGS_GPROF "-O1 -pg")
 ADD_EXECUTABLE(manhattan manhattan.cc)
 ADD_EXECUTABLE(lcs lcs.cc)
 ADD_EXECUTABLE(longest_path longest_path.cc)
+ADD_EXECUTABLE(global_alignment global_alignment.cc)
+ADD_EXECUTABLE(local_alignment local_alignment.cc)
+ADD_EXECUTABLE(edit_dist edit_dist.cc)
+ADD_EXECUTABLE(fitting fitting_alignment.cc)
+ADD_EXECUTABLE(overlap overlap.cc)
+ADD_EXECUTABLE(gap gap_alignment.cc)
+ADD_EXECUTABLE(middle_edge middle_edge.cc)
+ADD_EXECUTABLE(multiple multiple.cc)
 
 

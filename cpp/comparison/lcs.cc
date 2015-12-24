@@ -25,7 +25,7 @@ string LCS(const string &a, const string &b) {
       current[0] = 1;
     } else {
       choice[i][0] = -1;
-      current[0] = 0;
+      current[0] = previous[0];
     }
     for (int j = 1; j < b.size(); ++j) {
       if (a[i] == b[j]) {
